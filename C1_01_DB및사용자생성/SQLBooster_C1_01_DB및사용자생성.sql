@@ -17,7 +17,7 @@ EXTENT MANAGEMENT LOCAL SEGMENT SPACE MANAGEMENT AUTO
 -- ************************************************
 -- PART I - 1.1.2 SQL1, SYS USER 사용 - 사용자 생성
 -- ************************************************
-CREATE USER ORA_SQL_TEST IDENTIFIED BY "1234" DEFAULT TABLESPACE ORA_SQL_TEST;
+CREATE USER ORA_SQL_TEST IDENTIFIED BY "비밀번호" DEFAULT TABLESPACE ORA_SQL_TEST;
 
 -- ************************************************
 -- PART I - 1.1.2 SQL2, SYS USER 사용 - 사용자 접속 권한 설정
@@ -41,14 +41,14 @@ GRANT EXECUTE ON DBMS_STATS TO ORA_SQL_TEST;
 GRANT SELECT ON DBA_SEGMENTS TO ORA_SQL_TEST;
 
 -- ************************************************
--- PART I - 1.1.2 SQL4, SYS USER 사용 - TEMP 크기 확인
+-- PART I - 1.1.2 SQL4, SYS USER 사용 - TEMP 크기 확인(단위 메가바이트)
 -- ************************************************
-	SELECT  T1.FILE_NAME
-			,(T1.BYTES / 1024 / 1024) TMP_MB
-	FROM    DBA_TEMP_FILES T1;
+SELECT T1.FILE_NAME
+    , (T1.BYTES / 1024 / 1024) TMP_MB
+  FROM DBA_TEMP_FILES T1;
 
 
 -- ************************************************
 -- PART I - 1.1.2 SQL5, SYS USER 사용 - TEMP 크기 변경
 -- ************************************************
-	ALTER DATABASE TEMPFILE 'D:\APP\82103\ORADATA\ORCL\TEMP01.DBF' RESIZE 5000M;
+ALTER DATABASE TEMPFILE 'D:\APP\82103\ORADATA\ORCL\TEMP01.DBF' RESIZE 5000M;
