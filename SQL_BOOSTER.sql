@@ -43,9 +43,9 @@ GRANT SELECT ON DBA_SEGMENTS TO ORA_SQL_TEST;
 -- ************************************************
 -- PART I - 1.1.2 SQL4, SYS USER 사용 - TEMP 크기 확인
 -- ************************************************
-	SELECT  T1.FILE_NAME
-			,(T1.BYTES / 1024 / 1024) TMP_MB
-	FROM    DBA_TEMP_FILES T1;
+SELECT T1.FILE_NAME
+    , (T1.BYTES / 1024 / 1024) TMP_MB
+  FROM DBA_TEMP_FILES T1;
 
 
 -- ************************************************
