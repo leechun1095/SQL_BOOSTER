@@ -250,72 +250,358 @@ ALTER DATABASE TEMPFILE 'D:\APP\82103\ORADATA\ORCL\TEMP01.DBF' RESIZE 5000M;
 
 
 
-    -- ************************************************
-    -- PART I - 2.1.1 SQL1
-    -- ************************************************
+-- ************************************************
+-- PART I - 2.1.1 SQL1
+-- ************************************************
 
-    	-- 주문일시, 지불유형별 주문금액
-    	SELECT  T1.ORD_DT ,T1.PAY_TP
-    			,SUM(T1.ORD_AMT) ORD_AMT
-    	FROM    T_ORD T1
-    	WHERE   T1.ORD_ST = 'COMP'
-    	GROUP BY T1.ORD_DT ,T1.PAY_TP
-    	ORDER BY T1.ORD_DT ,T1.PAY_TP;
+-- GROUP BY에 사용한 컬럼만 SELECT 절에서 그대로 사용할 수 있다.
+-- GROUP BY에 사용하지 않은 컬럼은 SELECT 절에서 집계함수를 사용해야 한다.
 
+-- 주문일시, 지불유형별 주문금액
+SELECT T1.ORD_DT ,T1.PAY_TP
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.ORD_ST = 'COMP'
+ GROUP BY T1.ORD_DT ,T1.PAY_TP
+ ORDER BY T1.ORD_DT ,T1.PAY_TP;
 
-    -- ************************************************
-    -- PART I - 2.1.1 SQL2
-    -- ************************************************
+-- ************************************************
+-- PART I - 2.1.1 SQL2
+-- ************************************************
 
-    	-- 집계함수 - 정상적인 SQL, 에러가 발생하는 SQL
-    	SELECT  COUNT(*) CNT
-    			,SUM(T1.ORD_AMT) TTL_ORD_AMT
-    			,MIN(T1.ORD_SEQ) MIN_ORD_SEQ
-    			,MAX(T1.ORD_SEQ) MAX_ORD_SEQ
-    	FROM    T_ORD T1
-    	WHERE T1.ORD_DT >= TO_DATE('20170101','YYYYMMDD')
-    	AND T1.ORD_DT < TO_DATE('20170201','YYYYMMDD');
-
-
-    	SELECT  T1.ORD_ST
-    			,COUNT(*) CNT
-    			,SUM(T1.ORD_AMT) TTL_ORD_AMT
-    			,MIN(T1.ORD_SEQ) MIN_ORD_SEQ
-    			,MAX(T1.ORD_SEQ) MAX_ORD_SEQ
-    	FROM    T_ORD T1
-    	WHERE T1.ORD_DT>= TO_DATE('20170101','YYYYMMDD')
-    	AND T1.ORD_DT < TO_DATE('20170201','YYYYMMDD');
+-- 집계함수 - 정상적인 SQL, 에러가 발생하는 SQL
+SELECT COUNT(*) CNT
+     , SUM(T1.ORD_AMT) TTL_ORD_AMT
+     , MIN(T1.ORD_SEQ) MIN_ORD_SEQ
+     , MAX(T1.ORD_SEQ) MAX_ORD_SEQ
+  FROM T_ORD T1
+ WHERE T1.ORD_DT >= TO_DATE('20170101','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170201','YYYYMMDD');
 
 
-
-    -- ************************************************
-    -- PART I - 2.1.2 SQL1
-    -- ************************************************
-
-    	-- CASE를 이용해 가격유형(ORD_AMT_TP)별로 주문 건수를 카운트
-    	SELECT  T1.ORD_ST
-    			,CASE WHEN T1.ORD_AMT >= 5000 THEN 'High Order'
-    				  WHEN T1.ORD_AMT >= 3000 THEN 'Middle Order'
-    				  ELSE 'Low Order'
-    			 END ORD_AMT_TP
-    			,COUNT(*) ORD_CNT
-    	FROM    T_ORD T1
-    	GROUP BY T1.ORD_ST
-    			,CASE WHEN T1.ORD_AMT >= 5000 THEN 'High Order'
-    				  WHEN T1.ORD_AMT >= 3000 THEN 'Middle Order'
-    				  ELSE 'Low Order'
-    			 END
-    	ORDER BY 1 ,2;
+SELECT T1.ORD_ST
+     , COUNT(*) CNT
+     , SUM(T1.ORD_AMT) TTL_ORD_AMT
+     , MIN(T1.ORD_SEQ) MIN_ORD_SEQ
+     , MAX(T1.ORD_SEQ) MAX_ORD_SEQ
+  FROM T_ORD T1
+ WHERE T1.ORD_DT>= TO_DATE('20170101','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170201','YYYYMMDD');
 
 
-    -- ************************************************
-    -- PART I - 2.1.2 SQL2
-    -- ************************************************
 
-    	-- TO_CHAR 변형을 이용한 주문년월, 지불유형별 주문건수
-    	SELECT  TO_CHAR(T1.ORD_DT,'YYYYMM') ORD_YM ,T1.PAY_TP
-    			,COUNT(*) ORD_CNT
-    	FROM    T_ORD T1
-    	WHERE   T1.ORD_ST = 'COMP'
-    	GROUP BY TO_CHAR(T1.ORD_DT,'YYYYMM') ,T1.PAY_TP
-    	ORDER BY TO_CHAR(T1.ORD_DT,'YYYYMM') ,T1.PAY_TP;
+-- ************************************************
+-- PART I - 2.1.2 SQL1
+-- ************************************************
+
+-- CASE를 이용해 가격유형(ORD_AMT_TP)별로 주문 건수를 카운트
+SELECT T1.ORD_ST
+     , CASE WHEN T1.ORD_AMT >= 5000 THEN 'High Order'
+            WHEN T1.ORD_AMT >= 3000 THEN 'Middle Order'
+       ELSE 'Low Order'
+       END ORD_AMT_TP
+     , COUNT(*) ORD_CNT
+  FROM T_ORD T1
+ GROUP BY T1.ORD_ST
+     , CASE WHEN T1.ORD_AMT >= 5000 THEN 'High Order'
+            WHEN T1.ORD_AMT >= 3000 THEN 'Middle Order'
+            ELSE 'Low Order'
+            END
+ ORDER BY 1 ,2;
+
+
+-- ************************************************
+-- PART I - 2.1.2 SQL2
+-- ************************************************
+
+-- TO_CHAR 변형을 이용한 주문년월, 지불유형별 주문건수
+SELECT TO_CHAR(ORD_DT, 'YYYYMMDD') ORD_YM
+     , PAY_TP
+     , count(*) ORD_CNT
+  FROM T_ORD
+ WHERE ORD_ST = 'COMP'
+ GROUP BY TO_CHAR(ORD_DT, 'YYYYMMDD'), PAY_TP
+ ORDER BY TO_CHAR(ORD_DT, 'YYYYMMDD'), PAY_TP
+
+
+-- ************************************************
+-- PART I - 2.1.3 SQL1
+-- ************************************************
+
+-- 주문년월별 계좌이체(PAY_TP=BANK) 건수와 카드결제(PAY_TP=CARD) 건수
+SELECT TO_CHAR(ORD_DT, 'YYYYMM') ORD_YM
+     , SUM(CASE WHEN PAY_TP = 'BANK' THEN 1 END) BANK_PAY_CNT
+     , SUM(CASE WHEN PAY_TP = 'CARD' THEN 1 END) CARD_PAY_CNT
+  FROM T_ORD
+ WHERE ORD_ST = 'COMP'
+ GROUP BY TO_CHAR(ORD_DT, 'YYYYMM')
+ ORDER BY TO_CHAR(ORD_DT, 'YYYYMM')
+/*
+--------------------------------------
+	  ORD_YM	BANK_PAY_CNT	CARD_PAY_CNT
+--------------------------------------
+1	  201701	73	          145
+2	  201702	59	          119
+3	  201703	57	          110
+4	  201704	63	          131
+5	  201705	84	          167
+6	  201706	81	          162
+7	  201707	84	          168
+8	  201708	84	          167
+9	  201709	81	          162
+10	201710	84	          167
+11	201711	81	          162
+12	201712	84	          167
+*/
+
+-- ************************************************
+-- PART I - 2.1.3 SQL2
+-- ************************************************
+
+-- 지불유형(PAY_TP)별 주문건수(주문 건수를 주문년월별로 컬럼으로 표시)
+SELECT T1.PAY_TP
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201701' THEN 'A' END) ORD_CNT_1701
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201702' THEN 'A' END) ORD_CNT_1702
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201703' THEN 'A' END) ORD_CNT_1703
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201704' THEN 'A' END) ORD_CNT_1704
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201705' THEN 'A' END) ORD_CNT_1705
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201706' THEN 'A' END) ORD_CNT_1706
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201707' THEN 'A' END) ORD_CNT_1707
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201708' THEN 'A' END) ORD_CNT_1708
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201709' THEN 'A' END) ORD_CNT_1709
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201710' THEN 'A' END) ORD_CNT_1710
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201711' THEN 'A' END) ORD_CNT_1711
+     , COUNT(CASE WHEN TO_CHAR(T1.ORD_DT,'YYYYMM') = '201712' THEN 'A' END) ORD_CNT_1712
+  FROM T_ORD T1
+ WHERE T1.ORD_ST = 'COMP'
+ GROUP BY T1.PAY_TP
+ ORDER BY T1.PAY_TP;
+/*
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	PAY_TP	ORD_CNT_1701	ORD_CNT_1702	ORD_CNT_1703	ORD_CNT_1704	ORD_CNT_1705	ORD_CNT_1706	ORD_CNT_1707	ORD_CNT_1708	ORD_CNT_1709	ORD_CNT_1710	ORD_CNT_1711	ORD_CNT_1712
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	BANK	  73	          59	          57	          63	          84	          81	          84	          84	          81	          84	          81	          84
+	CARD	  145	          119	          110	          131	          167	          162	          168	          167	          162	          167	          162	          167
+*/
+
+-- ************************************************
+-- PART I - 2.1.3 SQL3
+-- ************************************************
+
+-- 지불유형(PAY_TP)별 주문건수(주문 건수를 주문년월별로 컬럼으로 표시) – 인라인-뷰 활용
+SELECT T1.PAY_TP
+     , MAX(CASE WHEN T1.ORD_YM = '201701' THEN T1.ORD_CNT END) ORD_CNT_1701
+     , MAX(CASE WHEN T1.ORD_YM = '201702' THEN T1.ORD_CNT END) ORD_CNT_1702
+     , MAX(CASE WHEN T1.ORD_YM = '201703' THEN T1.ORD_CNT END) ORD_CNT_1703
+     , MAX(CASE WHEN T1.ORD_YM = '201704' THEN T1.ORD_CNT END) ORD_CNT_1704
+     , MAX(CASE WHEN T1.ORD_YM = '201705' THEN T1.ORD_CNT END) ORD_CNT_1705
+     , MAX(CASE WHEN T1.ORD_YM = '201706' THEN T1.ORD_CNT END) ORD_CNT_1706
+     , MAX(CASE WHEN T1.ORD_YM = '201707' THEN T1.ORD_CNT END) ORD_CNT_1707
+     , MAX(CASE WHEN T1.ORD_YM = '201708' THEN T1.ORD_CNT END) ORD_CNT_1708
+     , MAX(CASE WHEN T1.ORD_YM = '201709' THEN T1.ORD_CNT END) ORD_CNT_1709
+     , MAX(CASE WHEN T1.ORD_YM = '201710' THEN T1.ORD_CNT END) ORD_CNT_1710
+     , MAX(CASE WHEN T1.ORD_YM = '201711' THEN T1.ORD_CNT END) ORD_CNT_1711
+     , MAX(CASE WHEN T1.ORD_YM = '201712' THEN T1.ORD_CNT END) ORD_CNT_1712
+  FROM (
+        SELECT T1.PAY_TP
+             , TO_CHAR(T1.ORD_DT,'YYYYMM') ORD_YM
+             , COUNT(*) ORD_CNT
+          FROM T_ORD T1
+         WHERE T1.ORD_ST = 'COMP'
+         GROUP BY T1.PAY_TP ,TO_CHAR(T1.ORD_DT,'YYYYMM')
+       ) T1
+ GROUP BY T1.PAY_TP;
+/*
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	PAY_TP	ORD_CNT_1701	ORD_CNT_1702	ORD_CNT_1703	ORD_CNT_1704	ORD_CNT_1705	ORD_CNT_1706	ORD_CNT_1707	ORD_CNT_1708	ORD_CNT_1709	ORD_CNT_1710	ORD_CNT_1711	ORD_CNT_1712
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+	BANK	  73	          59	          57	          63	          84	          81	          84	          84	          81	          84	          81	          84
+	CARD	  145	          119	          110	          131	          167	          162	          168	          167	          162	          167	          162	          167
+*/
+
+-- ************************************************
+-- PART I - 2.1.4 SQL1
+-- ************************************************
+
+-- NULL에 대한 COUNT #1
+SELECT COUNT(COL1) CNT_COL1
+     , COUNT(COL2) CNT_COL2
+     , COUNT(COL3) CNT_COL3
+  FROM (
+        SELECT 'A' COL1
+             , NULL COL2
+             , 'C' COL3
+          FROM DUAL
+        UNION ALL
+        SELECT 'B' COL1
+             , NULL COL2
+             , NULL COL3
+          FROM DUAL
+       ) T1;
+
+/*
+------------------
+	COL1	COL2	COL3
+------------------
+	   A	         C
+	   B
+
+------------------------------
+	CNT_COL1	CNT_COL2	CNT_COL3
+------------------------------
+	       2	       0       	 1
+*/
+
+-- ************************************************
+-- PART I - 2.1.4 SQL2
+-- ************************************************
+
+-- NULL에 대한 COUNT #2
+-- count(col1) : null이기 때문에 0 이지만,
+-- count(*) : 2가 나온다, row 자체의 건수를 카운트하기 때문이다.
+
+SELECT COUNT(COL1) CNT_COL1
+     , COUNT(*) CNT_ALL
+  FROM (
+        SELECT NULL COL1
+          FROM DUAL
+         UNION ALL
+        SELECT NULL COL1
+          FROM DUAL
+       ) T1
+
+/*
+--------------------
+	COL1
+--------------------
+ (null)
+ (null)
+
+--------------------
+	CNT_COL1	CNT_ALL
+--------------------
+	       0	      2
+*/
+
+-- ************************************************
+-- PART I - 2.1.5 SQL1
+-- ************************************************
+
+-- 주문년월별 주문고객 수(중복을 제거해서 카운트), 주문건수
+SELECT TO_CHAR(T1.ORD_DT, 'YYYYMM') ORD_YM
+     , COUNT(DISTINCT T1.CUS_ID) CUS_CNT
+     , COUNT(*) ORD_CNT
+  FROM T_ORD T1
+ WHERE T1.ORD_DT >= TO_DATE('20170101', 'YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170401', 'YYYYMMDD')
+ GROUP BY TO_CHAR(T1.ORD_DT, 'YYYYMM')
+ ORDER BY TO_CHAR(T1.ORD_DT, 'YYYYMM')
+
+ /*
+ ------------------------
+ 	ORD_YM	CUS_CNT	ORD_CNT
+ ------------------------
+1	201701	     81	    243
+2	201702	     72	    198
+3	201703	     60	    185
+ */
+
+ -- ************************************************
+ -- PART I - 2.1.5 SQL2
+ -- ************************************************
+
+-- 주문상태(ORD_ST)와 지불유형(PAY_TP)의 조합에 대한 종류 수
+--ERROR
+SELECT COUNT(DISTINCT T1.ORD_ST ,T1.PAY_TP)
+  FROM T_ORD T1;
+--ORA-00909: invalid number of arguments
+
+--USE CONCAT
+SELECT COUNT(DISTINCT T1.ORD_ST || '-' || T1.PAY_TP)
+  FROM T_ORD T1;
+/*
+==========================================
+  COUNT(DISTINCTT1.ORD_ST||'-'||T1.PAY_TP)
+==========================================
+1	                                       3
+*/
+
+-- 왜 아래 쿼리는 0건일까..?
+SELECT * FROM T_ORD
+ WHERE ORD_ST = 'WAIT'
+   AND PAY_TP IS NULL
+
+-- ORD_ST(2가지) : WAIT, COMP
+SELECT COUNT(DISTINCT ORD_ST) FROM T_ORD
+
+-- PAY_TP(2가지) : CARD, BANK
+SELECT COUNT(DISTINCT PAY_TP) FROM T_ORD
+
+/*
+===============
+ ORD_ST  PAY_TP => 3개의 경우의 수
+===============
+1  WAIT    NULL = 305건
+2  COMP    CARD = 1827건
+3  COMP    BANK = 915건
+4  WAIT    CARD = 0건
+5  WAIT    BANK = 0건
+*/
+
+-- ************************************************
+-- PART I - 2.1.5 SQL3
+-- ************************************************
+
+-- 주문상태(ORD_ST)와 지불유형(PAY_TP)의 조합에 대한 종류 수 – 인라인-뷰로 해결
+SELECT COUNT(*)
+  FROM (
+        SELECT DISTINCT T1.ORD_ST
+             , T1.PAY_TP
+          FROM T_ORD T1
+       ) T2
+
+-- ************************************************
+-- PART I - 2.1.6 SQL1
+-- ************************************************
+
+-- WHERE - GROUP BY - HAVING - ORDER BY
+
+-- 고객ID, 지불유형(PAY_TP)별 주문금액이 10,000 이상인 데이터만 조회
+SELECT T1.CUS_ID
+     , T1.PAY_TP
+     , SUM(T1.ORD_AMT) ORD_TTL_AMT
+  FROM T_ORD T1
+ WHERE T1.ORD_ST = 'COMP'
+ GROUP BY T1.CUS_ID, T1.PAY_TP
+HAVING SUM(T1.ORD_AMT) >= 10000
+ ORDER BY SUM(T1.ORD_AMT) ASC
+
+-- ************************************************
+-- PART I - 2.1.6 SQL2
+-- ************************************************
+-- HAVING 절에는 GROUP BY에 사용한 컬럼 또는 집계함수를 사용한 컬럼만 사용 가능하다.
+SELECT T1.CUS_ID ,T1.PAY_TP ,SUM(T1.ORD_AMT) ORD_TTL_MT
+  FROM T_ORD T1
+ GROUP BY T1.CUS_ID ,T1.PAY_TP
+HAVING T1.ORD_ST = 'COMP' --ERROR
+ ORDER BY SUM(T1.ORD_AMT) ASC;
+-- 에러 발생: ORA-00979: not a GROUP BY expression
+
+-- 1. ORD_ST 에 대한 조건은 HAVING 절이 아닌 WHERE 절에서 사용해야 한다.
+-- 2. ORD_ST 컬럼을 HAVING 절에서 사용하려면 ORD_ST 컬럼이 GROUP BY 절에 있어야 한다.
+-- 3. 또는 ORD_ST 컬럼을 MAX, MIN과 같은 집계함수 처리한 후에 HAVING 절에 사용할 수 있다.
+-- 4. HAVING 조건 대신 GROUP BY 결과를 인라인-뷰로 처리하고 바깥에서 WHERE 절로 처리할 수 있다.(2.1.6 SQL3 참고)
+
+-- ************************************************
+-- PART I - 2.1.6 SQL3
+-- ************************************************
+-- HAVING절 대신 인라인-뷰를 사용
+SELECT T0.*
+  FROM (
+    		SELECT  T1.CUS_ID ,T1.PAY_TP ,SUM(T1.ORD_AMT) ORD_TTL_AMT
+    		FROM    T_ORD T1
+    		WHERE   T1.ORD_ST = 'COMP'
+    		GROUP BY T1.CUS_ID ,T1.PAY_TP
+		   ) T0
+ WHERE T0.ORD_TTL_AMT >= 10000
+ ORDER BY T0.ORD_TTL_AMT ASC;
