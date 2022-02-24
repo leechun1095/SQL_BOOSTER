@@ -605,3 +605,371 @@ SELECT T0.*
 		   ) T0
  WHERE T0.ORD_TTL_AMT >= 10000
  ORDER BY T0.ORD_TTL_AMT ASC;
+
+-- ************************************************
+-- PART I - 2.2.1 SQL1
+-- ************************************************
+-- GROUP BY와 GROUP BY~ROLLUP의 비교
+SELECT TO_CHAR(T1.ORD_DT,'YYYYMM') ORD_YM
+     , T1.CUS_ID
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.CUS_ID IN ('CUS_0001','CUS_0002')
+   AND T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD')
+ GROUP BY TO_CHAR(T1.ORD_DT,'YYYYMM'),T1.CUS_ID
+ ORDER BY TO_CHAR(T1.ORD_DT,'YYYYMM'),T1.CUS_ID
+;
+
+SELECT TO_CHAR(T1.ORD_DT,'YYYYMM') ORD_YM
+     , T1.CUS_ID
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.CUS_ID IN ('CUS_0001','CUS_0002')
+   AND T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD')
+ GROUP BY
+ROLLUP (TO_CHAR(T1.ORD_DT,'YYYYMM') ,T1.CUS_ID)
+ ORDER BY TO_CHAR(T1.ORD_DT,'YYYYMM') ,T1.CUS_ID
+;
+/*
+ORD_YM	CUS_ID	  ORD_AMT
+201703	CUS_0001	  2800
+201703	CUS_0002  	4300
+201703		          7100(ORD_YM별 합계)
+201704	CUS_0001	  5000
+201704	CUS_0002	  1900
+201704		          6900(ORD_YM별 합계)
+		               14000(전체 합계)
+*/
+
+-- ************************************************
+-- PART I - 2.2.2 SQL1
+-- ************************************************
+-- 주문상태, 주문년월, 고객ID 순서로 ROLLUP
+SELECT T1.ORD_ST
+     , TO_CHAR(T1.ORD_DT,'YYYYMM') ORD_YM
+     , T1.CUS_ID
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.CUS_ID IN ('CUS_0001','CUS_0002')
+   AND T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD')
+ GROUP BY ROLLUP(T1.ORD_ST, TO_CHAR(T1.ORD_DT,'YYYYMM'), T1.CUS_ID)
+ ORDER BY T1.ORD_ST ,TO_CHAR(T1.ORD_DT,'YYYYMM') ,T1.CUS_ID
+;
+/*
+ORD_ST	ORD_YM	CUS_ID	  ORD_AMT
+COMP	  201703	CUS_0001	   2800
+COMP	  201703	CUS_0002	   4300
+COMP	  201703		           7100
+COMP	  201704	CUS_0001	   4100
+COMP	  201704	CUS_0002	   1900
+COMP	  201704		           6000
+COMP			                  13100(ORD_ST별 합계)
+WAIT	  201704	CUS_0001	    900
+WAIT	  201704		            900
+WAIT			                    900(ORD_ST별 합계)
+			                      14000(전체 합계)
+*/
+
+-- ************************************************
+-- PART I - 2.2.2 SQL2
+-- ************************************************
+-- 주문년월, 주문상태, 고객ID 순서로 ROLLUP(위 SQL에서 ROLLUP부분만 변경해서 수행한다.)
+SELECT T1.ORD_ST
+     , TO_CHAR(T1.ORD_DT,'YYYYMM') ORD_YM
+     , T1.CUS_ID
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.CUS_ID IN ('CUS_0001','CUS_0002')
+   AND T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD')
+ GROUP BY ROLLUP(TO_CHAR(T1.ORD_DT,'YYYYMM'), T1.ORD_ST, T1.CUS_ID)
+ ORDER BY T1.ORD_ST ,TO_CHAR(T1.ORD_DT,'YYYYMM') ,T1.CUS_ID
+;
+/*
+ORD_ST	ORD_YM	CUS_ID	  ORD_AMT
+COMP	  201703	CUS_0001	   2800
+COMP	  201703	CUS_0002	   4300
+COMP	  201703		           7100
+COMP	  201704	CUS_0001	   4100
+COMP	  201704	CUS_0002	   1900
+COMP	  201704		           6000
+WAIT	  201704	CUS_0001	    900
+WAIT	  201704		            900
+	      201703		           7100(ORD_YM별 합계)
+	      201704		           6900(ORD_YM별 합계)
+			                      14000(전체 합계)
+*/
+
+-- ************************************************
+-- PART I - 2.2.3 SQL1
+-- ************************************************
+-- NULL이 존재하는 컬럼인 PAY_TP에 대해 ROLLUP을 수행
+SELECT T1.ORD_ST
+     , T1.PAY_TP -- null 값 존재하는 컬럼
+     , COUNT(*) ORD_CNT
+	FROM T_ORD T1
+ GROUP BY T1.ORD_ST ,T1.PAY_TP;
+/*
+ORD_ST	PAY_TP	ORD_CNT
+COMP	  CARD	     1827
+WAIT		(null)      305
+COMP	  BANK	      915
+*/
+
+-- WAIT 부분에서 중간 소계인지 값이 null인지 분간이 안된다.
+SELECT T1.ORD_ST
+     , T1.PAY_TP -- null 값 존재하는 컬럼
+     , COUNT(*) ORD_CNT
+	FROM T_ORD T1
+ GROUP BY ROLLUP(T1.ORD_ST ,T1.PAY_TP);
+/*
+ORD_ST	PAY_TP	ORD_CNT
+COMP	  BANK	      915
+COMP	  CARD	     1827
+COMP		(null)     2742
+WAIT		(null)      305
+WAIT		(null)      305
+(null)  (null)		 3047
+*/
+
+-- ************************************************
+-- PART I - 2.2.3 SQL2
+-- ************************************************
+-- NULL이 존재하는 컬럼인 PAY_TP에 대해 ROLLUP을 수행. GROUPING함수 사용
+SELECT T1.ORD_ST
+     , GROUPING(T1.ORD_ST) GR_ORD_ST  --GROUPING : 해당 컬럼이 ROLLUP 처리되었으면 1 반환, 그렇지 않으면 0 반환
+     , T1.PAY_TP
+     , GROUPING(T1.PAY_TP) GR_PAY_TP
+     , COUNT(*) ORD_CNT
+  FROM T_ORD T1
+ GROUP BY ROLLUP(T1.ORD_ST, T1.PAY_TP);
+/*
+ORD_ST	GR_ORD_ST	  PAY_TP	GR_PAY_TP	ORD_CNT
+COMP	          0	  BANK	          0	    915
+COMP	          0	  CARD	          0	   1827
+COMP	          0		                1	   2742
+WAIT	          0		                0	    305
+WAIT	          0		                1	    305
+	              1		                1	   3047(전체 합계)
+*/
+
+-- ************************************************
+-- PART I - 2.2.3 SQL3
+-- ************************************************
+-- ROLLUP되는 컬럼을 Total로 표시
+SELECT CASE WHEN GROUPING(T1.ORD_ST) = 1 THEN 'Total' ELSE T1.ORD_ST END ORD_ST
+     , CASE WHEN GROUPING(T1.PAY_TP) = 1 THEN 'Total' ELSE T1.PAY_TP END PAY_TP
+     , COUNT(*) ORD_CNT
+	FROM T_ORD T1
+ GROUP BY ROLLUP(T1.ORD_ST ,T1.PAY_TP)
+ ORDER BY T1.ORD_ST ,T1.PAY_TP;
+/*
+ORD_ST	PAY_TP	ORD_CNT
+COMP	  BANK	      915
+COMP	  CARD	     1827
+COMP	  Total	     2742
+WAIT		            305
+WAIT	  Total	      305
+Total	  Total	     3047(전체 합계)
+*/
+
+-- ************************************************
+-- PART I - 2.2.4 SQL1
+-- ************************************************
+-- 주문년월, 지역ID, 고객등급별 주문금액 - ROLLUP
+SELECT CASE WHEN GROUPING(TO_CHAR(T2.ORD_DT,'YYYYMM'))=1 THEN 'Total'
+       ELSE TO_CHAR(T2.ORD_DT,'YYYYMM') END ORD_YM
+     , CASE WHEN GROUPING(T1.RGN_ID) = 1 THEN 'Total' ELSE T1.RGN_ID END RGN_ID
+     , CASE WHEN GROUPING(T1.CUS_GD) = 1 THEN 'Total' ELSE T1.CUS_GD END CUS_GD
+     , SUM(T2.ORD_AMT) ORD_AMT
+  FROM M_CUS T1
+     , T_ORD T2
+ WHERE T1.CUS_ID = T2.CUS_ID
+   AND T2.ORD_DT >= TO_DATE('20170201','YYYYMMDD')
+   AND T2.ORD_DT < TO_DATE('20170401','YYYYMMDD')
+   AND T1.RGN_ID IN ('A','B')
+-- GROUP BY TO_CHAR(T2.ORD_DT,'YYYYMM') ,T1.RGN_ID ,T1.CUS_GD
+-- GROUP BY ROLLUP(TO_CHAR(T2.ORD_DT,'YYYYMM') ,T1.RGN_ID ,T1.CUS_GD)
+ GROUP BY ROLLUP((TO_CHAR(T2.ORD_DT,'YYYYMM') ,T1.RGN_ID ,T1.CUS_GD))
+-- GROUP BY TO_CHAR(T2.ORD_DT,'YYYYMM'), ROLLUP(T1.RGN_ID ,T1.CUS_GD)
+-- GROUP BY T1.RGN_ID, T1.CUS_GD, ROLLUP(TO_CHAR(T2.ORD_DT,'YYYYMM'))
+ ORDER BY TO_CHAR(T2.ORD_DT,'YYYYMM') ,T1.RGN_ID ,T1.CUS_GD
+;
+/* 전체 합계만 구하기
+ORD_YM	RGN_ID	CUS_GD	ORD_AMT
+201702	  A	      A	      72040
+201702	  A	      B	      33760
+201702	  B     	A	      59620
+201702	  B	      B	      28720
+201703	  A	      A	      88720
+201703	  B	      A	      82740
+Total	  Total	  Total	   365600(전체 합계)
+*/
+
+-- ************************************************
+-- PART I - 2.3.1 SQL1
+-- ************************************************
+-- 주문년월, 고객ID별 주문금액 – ROLLUP 사용
+SELECT TO_CHAR(T1.ORD_DT,'YYYYMM') ORD_YM
+     , T1.CUS_ID
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.CUS_ID IN ('CUS_0001','CUS_0002')
+   AND T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD')
+ GROUP BY ROLLUP(TO_CHAR(T1.ORD_DT,'YYYYMM') ,T1.CUS_ID);
+/*
+ORD_YM	CUS_ID	  ORD_AMT
+201703	CUS_0001  	2800
+201703	CUS_0002	  4300
+201703		          7100
+201704	CUS_0001	  5000
+201704	CUS_0002	  1900
+201704		          6900
+		               14000(전체 합계)
+*/
+-- ************************************************
+-- PART I - 2.3.1 SQL2
+-- ************************************************
+-- ROLLUP을 UNION ALL로 대신하기
+SELECT TO_CHAR(T1.ORD_DT,'YYYYMM') ORD_YM
+     , T1.CUS_ID
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.CUS_ID IN ('CUS_0001','CUS_0002')
+   AND T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD')
+ GROUP BY TO_CHAR(T1.ORD_DT,'YYYYMM') ,T1.CUS_ID
+/*
+ORD_YM	CUS_ID	ORD_AMT
+201704	CUS_0002	1900
+201704	CUS_0001	5000
+201703	CUS_0001	2800
+201703	CUS_0002	4300
+*/
+ UNION ALL
+SELECT TO_CHAR(T1.ORD_DT,'YYYYMM') ORD_YM
+     , 'Total' CUS_ID
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.CUS_ID IN ('CUS_0001','CUS_0002')
+   AND T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD')
+ GROUP BY TO_CHAR(T1.ORD_DT,'YYYYMM')
+/*
+ORD_YM	CUS_ID	ORD_AMT
+201703	Total	  7100
+201704	Total	  6900
+*/
+ UNION ALL
+SELECT 'Total' ORD_YM
+     , 'Total' CUS_ID
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.CUS_ID IN ('CUS_0001','CUS_0002')
+   AND T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD');
+/*
+ORD_YM	CUS_ID	ORD_AMT
+Total	  Total	  14000
+*/
+
+-- ************************************************
+-- PART I - 2.3.1 SQL3
+-- ************************************************
+-- ROLLUP을 카테시안 조인으로 대신하기
+SELECT CASE WHEN T2.RNO = 1 THEN TO_CHAR(T1.ORD_DT,'YYYYMM')
+       WHEN T2.RNO = 2 THEN TO_CHAR(T1.ORD_DT,'YYYYMM')
+       WHEN T2.RNO = 3 THEN 'Total' END ORD_YM
+     , CASE WHEN T2.RNO = 1 THEN T1.CUS_ID
+       WHEN T2.RNO = 2 THEN 'Total'
+       WHEN T2.RNO = 3 THEN 'Total' END CUS_ID
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+     , (SELECT ROWNUM RNO FROM DUAL CONNECT BY ROWNUM <= 3
+       ) T2
+ WHERE T1.CUS_ID IN ('CUS_0001','CUS_0002')
+   AND T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD')
+ GROUP BY CASE WHEN T2.RNO = 1 THEN TO_CHAR(T1.ORD_DT,'YYYYMM')
+               WHEN T2.RNO = 2 THEN TO_CHAR(T1.ORD_DT,'YYYYMM')
+               WHEN T2.RNO = 3 THEN 'Total' END
+     , CASE WHEN T2.RNO = 1 THEN T1.CUS_ID
+            WHEN T2.RNO = 2 THEN 'Total'
+            WHEN T2.RNO = 3 THEN 'Total' END;
+
+-- ************************************************
+-- PART I - 2.3.1 SQL4
+-- ************************************************
+-- ROLLUP을 WITH 절과 UNION ALL로 대체
+WITH T_RES AS (
+               SELECT TO_CHAR(T1.ORD_DT,'YYYYMM') ORD_YM
+                    , T1.CUS_ID
+                    , SUM(T1.ORD_AMT) ORD_AMT
+                 FROM T_ORD T1
+                WHERE T1.CUS_ID IN ('CUS_0001','CUS_0002')
+                  AND T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+                  AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD')
+                GROUP BY TO_CHAR(T1.ORD_DT,'YYYYMM') ,T1.CUS_ID
+)
+SELECT T1.ORD_YM ,T1.CUS_ID ,T1.ORD_AMT
+  FROM T_RES T1
+
+ UNION ALL
+SELECT T1.ORD_YM
+     , 'Total'
+     , SUM(T1.ORD_AMT)
+  FROM T_RES T1
+ GROUP BY T1.ORD_YM
+
+ UNION ALL
+SELECT 'Total'
+     , 'Total'
+     , SUM(T1.ORD_AMT)
+  FROM T_RES T1;
+
+-- ************************************************
+-- PART I - 2.3.2 SQL1
+-- ************************************************
+-- 주문상태(ORD_ST), 주문년월, 고객ID별 주문금액 – CUBE로 가능한 모든 소계를 추가
+SELECT CASE  WHEN GROUPING(T1.ORD_ST)=1 THEN 'Total' ELSE T1.ORD_ST END ORD_ST
+     , CASE WHEN GROUPING(TO_CHAR(T1.ORD_DT,'YYYYMM'))=1 THEN 'Total'
+            ELSE TO_CHAR(T1.ORD_DT,'YYYYMM') END ORD_YM
+     , CASE WHEN GROUPING(T1.CUS_ID)=1 THEN 'Total' ELSE T1.CUS_ID END CUS_ID
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.CUS_ID IN ('CUS_0001','CUS_0002')
+   AND T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD')
+ GROUP BY CUBE(T1.ORD_ST, TO_CHAR(T1.ORD_DT,'YYYYMM'), T1.CUS_ID)
+ ORDER BY T1.ORD_ST, TO_CHAR(T1.ORD_DT,'YYYYMM'), T1.CUS_ID;
+
+-- ************************************************
+-- PART I - 2.3.3 SQL1
+-- ************************************************
+-- 주문년월, 고객ID별 주문건수와 주문 금액 – GROUPING SETS 활용
+SELECT TO_CHAR(T1.ORD_DT,'YYYYMM') ORD_YM
+     , T1.CUS_ID
+     , COUNT(*) ORD_CNT
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.ORD_DT >= TO_DATE('20170301','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170501','YYYYMMDD')
+   AND T1.CUS_ID IN ('CUS_0061','CUS_0062')
+ GROUP BY GROUPING SETS(
+       (TO_CHAR(T1.ORD_DT,'YYYYMM'),T1.CUS_ID)  --GROUP BY기본 데이터
+--     , (TO_CHAR(T1.ORD_DT,'YYYYMM'))  --주문년월별 소계
+--     , (T1.CUS_ID)  --고객ID별 소계
+     , ()   --전체합계
+ );
+/*
+ORD_YM	CUS_ID	  ORD_CNT	ORD_AMT
+201703	CUS_0061	  3	       7620
+201703	CUS_0062	  3	       4300
+201704	CUS_0061	  3	      10900
+201704	CUS_0062	  3	       3100
+		               12	      25920
+*/
