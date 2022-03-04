@@ -1464,3 +1464,201 @@ SELECT ROWNUM RNO FROM DUAL A CONNECT BY ROWNUM <= 10;
 -- 데이터 값별로 분포도 조정
 SELECT 'WAIT' ORD_ST FROM DUAL CONNECT BY ROWNUM <= 2 UNION ALL
 SELECT 'COMP' ORD_ST FROM DUAL CONNECT BY ROWNUM <= 3
+
+-- ************************************************
+-- PART I - 4.1.2 SQL1
+-- ************************************************
+-- 17년8월 총 주문금액 구하기 – SELECT절 단독 서브쿼리
+SELECT TO_CHAR(T1.ORD_DT, 'YYYYMMDD') ORD_YMD
+		 , SUM(T1.ORD_AMT) ORD_AMT
+		 , (
+        SELECT SUM(A.ORD_AMT)
+        	FROM T_ORD A
+         WHERE A.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+        	 AND A.ORD_DT < TO_DATE('20170901','YYYYMMDD')
+		   ) TOTAL_ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170901','YYYYMMDD')
+ GROUP BY TO_CHAR(T1.ORD_DT, 'YYYYMMDD');
+
+-- ************************************************
+-- PART I - 4.1.2 SQL2
+-- ************************************************
+-- 17년8월 총 주문금액, 주문일자의 주문금액비율 구하기 – SELECT절 단독 서브쿼리
+-- 주문금액 비율 = 주문일자별 주문금액(ORD_AMT) / 17년8월 주문 총 금액(TOTAL_ORD_AMT) * 100.00
+SELECT TO_CHAR(T1.ORD_DT, 'YYYYMMDD') ORD_YMD
+     , SUM(T1.ORD_AMT) ORD_AMT
+     , (
+        SELECT SUM(A.ORD_AMT)
+          FROM T_ORD A
+         WHERE A.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+           AND A.ORD_DT < TO_DATE('20170901','YYYYMMDD')
+       ) TOTAL_ORD_AMT
+     , ROUND(SUM(T1.ORD_AMT) / (
+                                SELECT  SUM(A.ORD_AMT)
+                                FROM    T_ORD A
+                                WHERE   A.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+                                AND     A.ORD_DT < TO_DATE('20170901','YYYYMMDD')
+                               ) * 100,2
+       ) ORD_AMT_RT
+  FROM T_ORD T1
+ WHERE T1.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170901','YYYYMMDD')
+ GROUP BY TO_CHAR(T1.ORD_DT, 'YYYYMMDD');
+
+-- ************************************************
+-- PART I - 4.1.2 SQL3
+-- ************************************************
+-- 인라인-뷰를 사용해 반복 서브쿼리를 제거하는 방법
+SELECT T1.ORD_YMD
+     , T1.ORD_AMT
+     , T1.TOTAL_ORD_AMT
+     , ROUND(T1.ORD_AMT / TOTAL_ORD_AMT * 100, 2) ORD_AMT_RATE
+  FROM (
+        SELECT TO_CHAR(T1.ORD_DT, 'YYYYMMDD') ORD_YMD
+             , SUM(T1.ORD_AMT) ORD_AMT
+             , (
+                SELECT SUM(A.ORD_AMT)
+                  FROM T_ORD A
+                 WHERE A.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+                   AND A.ORD_DT < TO_DATE('20170901','YYYYMMDD')
+               ) TOTAL_ORD_AMT
+          FROM T_ORD T1
+         WHERE T1.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+           AND T1.ORD_DT < TO_DATE('20170901','YYYYMMDD')
+         GROUP BY TO_CHAR(T1.ORD_DT, 'YYYYMMDD')
+  ) T1
+
+-- ************************************************
+-- PART I - 4.1.2 SQL4
+-- ************************************************
+-- 카테시안-조인을 사용해 반복 서브쿼리를 제거하는 방법
+SELECT TO_CHAR(T1.ORD_DT, 'YYYYMMDD') ORD_YMD
+     , SUM(T1.ORD_AMT) ORD_AMT
+     , MAX(T2.TOTAL_ORD_AMT) TOTAL_ORD_AMT
+     , ROUND(SUM(T1.ORD_AMT) / MAX(T2.TOTAL_ORD_AMT) * 100, 2) ORD_AMT_RT
+  FROM T_ORD T1
+     , (SELECT SUM(A.ORD_AMT) TOTAL_ORD_AMT
+          FROM T_ORD A
+         WHERE A.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+           AND A.ORD_DT < TO_DATE('20170901','YYYYMMDD')
+       ) T2
+ WHERE T1.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170901','YYYYMMDD')
+ GROUP BY TO_CHAR(T1.ORD_DT, 'YYYYMMDD');
+
+-- ************************************************
+-- PART I - 4.1.3 SQL1
+-- ************************************************
+-- 코드값을 가져오는 SELECT 절 상관 서브쿼리
+SELECT T1.ITM_TP
+     , (SELECT A.BAS_CD_NM
+          FROM C_BAS_CD A
+         WHERE A.BAS_CD_DV = 'ITM_TP'
+           AND A.BAS_CD = T1.ITM_TP  -- 기준코드 : KR
+           AND A.LNG_CD = 'KO'
+       ) ITM_TP_NM
+     , T1.ITM_ID
+     , T1.ITM_NM
+  FROM M_ITM T1;
+
+-- ************************************************
+-- PART I - 4.1.3 SQL2
+-- ************************************************
+-- 고객정보를 가져오는 SELECT 절 상관 서브쿼리 -> (잘못된 사례)서브쿼리 2군데 사용됨
+-- 불필요하게 M_CUS를 두번 접근할 필요가 없음
+-- 해당 쿼리를 조인으로 변경하는 것이 좋다.
+SELECT T1.CUS_ID
+     , TO_CHAR(T1.ORD_DT,'YYYYMMDD') ORD_YMD
+     , (SELECT A.CUS_NM FROM M_CUS A WHERE A.CUS_ID = T1.CUS_ID) CUS_NM
+     , (SELECT A.CUS_GD FROM M_CUS A WHERE A.CUS_ID = T1.CUS_ID) CUS_GD
+     , T1.ORD_AMT
+  FROM T_ORD T1
+ WHERE T1.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170901','YYYYMMDD');
+
+-- 조인으로 변경한 쿼리
+SELECT T1.CUS_ID
+     , TO_CHAR(T1.ORD_DT,'YYYYMMDD') ORD_YMD
+     , A.CUS_NM
+     , A.CUS_GD
+     , T1.ORD_AMT
+  FROM T_ORD T1
+ INNER JOIN M_CUS A
+    ON T1.CUS_ID = A.CUS_ID
+ WHERE T1.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+   AND T1.ORD_DT < TO_DATE('20170901','YYYYMMDD');
+
+-- ************************************************
+-- PART I - 4.1.3 SQL3
+-- ************************************************
+-- 인라인-뷰 안에서 SELECT 절 서브쿼리를 사용한 예 -> (잘못된 사례)
+-- 인라인-뷰가 1000건이고 바깥 GROUP 결과가 100건이면, 서브쿼리가 1000번 실행된다는 얘기임
+-- SELECT 절의 상관 서브쿼리는 가능하면 인라인-뷰 바깥에서 사용해야 한다.
+SELECT T1.CUS_ID
+     , SUBSTR(T1.ORD_YMD,1,6) ORD_YM
+     , MAX(T1.CUS_NM)
+     , MAX(T1.CUS_GD)
+     , T1.ORD_ST_NM
+     , T1.PAY_TP_NM
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM (
+        SELECT T1.CUS_ID
+             , TO_CHAR(T1.ORD_DT,'YYYYMMDD') ORD_YMD
+             , T2.CUS_NM
+             , T2.CUS_GD
+             , (SELECT A.BAS_CD_NM
+                  FROM C_BAS_CD A
+                 WHERE A.BAS_CD_DV = 'ORD_ST'
+                   AND A.BAS_CD = T1.ORD_ST
+                   AND A.LNG_CD = 'KO'
+               ) ORD_ST_NM
+             , (SELECT A.BAS_CD_NM
+                  FROM C_BAS_CD A
+                 WHERE A.BAS_CD_DV = 'PAY_TP'
+                   AND A.BAS_CD = T1.PAY_TP
+                   AND A.LNG_CD = 'KO'
+               ) PAY_TP_NM
+             , T1.ORD_AMT
+          FROM T_ORD T1, M_CUS T2 -- INNER JOIN
+         WHERE T1.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+           AND T1.ORD_DT < TO_DATE('20170901','YYYYMMDD')
+           AND T1.CUS_ID = T2.CUS_ID
+       ) T1
+ GROUP BY T1.CUS_ID, SUBSTR(T1.ORD_YMD,1,6), T1.ORD_ST_NM, T1.PAY_TP_NM;
+
+-- SELECT 절의 상관 서브쿼리 인라인-뷰 바깥으로 빼기
+-- 스칼라 서브쿼리 사용 시 GROUP BY에 스칼라 서브쿼리의 조건값을 꼭 넣어줘야한다.
+-- GROUP BY에 서브쿼리 전체 넣으면 에러난다.
+SELECT T1.CUS_ID 
+     , SUBSTR(T1.ORD_YMD,1,6) ORD_YM
+     , MAX(T1.CUS_NM)
+     , MAX(T1.CUS_GD)
+     , (SELECT BAS_CD_NM
+          FROM C_BAS_CD
+         WHERE BAS_CD_DV = 'ORD_ST'
+           AND BAS_CD = T1.ORD_ST
+           AND LNG_CD = 'KO'
+       ) ORD_ST_NM
+     , (SELECT BAS_CD_NM
+          FROM C_BAS_CD
+         WHERE BAS_CD_DV = 'PAY_TP'
+           AND BAS_CD = T1.PAY_TP
+           AND LNG_CD = 'KO'
+       ) PAY_TP_NM
+     , SUM(T1.ORD_AMT) ORD_AMT
+  FROM (
+        SELECT T1.CUS_ID
+             , TO_CHAR(T1.ORD_DT,'YYYYMMDD') ORD_YMD
+             , T2.CUS_NM
+             , T2.CUS_GD
+             , T1.ORD_AMT
+             , T1.ORD_ST
+             , T1.PAY_TP
+          FROM T_ORD T1, M_CUS T2 -- INNER JOIN
+         WHERE T1.ORD_DT >= TO_DATE('20170801','YYYYMMDD')
+           AND T1.ORD_DT < TO_DATE('20170901','YYYYMMDD')
+           AND T1.CUS_ID = T2.CUS_ID
+       ) T1
+ GROUP BY T1.CUS_ID, SUBSTR(T1.ORD_YMD,1,6), T1.ORD_ST, T1.PAY_TP;
