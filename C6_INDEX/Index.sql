@@ -536,3 +536,373 @@ Predicate Information (identified by operation id):
    3 - access("T1"."CUS_ID"='CUS_0075' AND "T1"."ORD_YMD" LIKE '201703%')
        filter("T1"."ORD_YMD" LIKE '201703%')
 */
+
+-- ************************************************
+-- PART II - 6.3.2 SQL1
+-- ************************************************
+-- ORD_YMD가 같다(=)조건으로 CUS_ID가 LIKE조건으로 사용하는 SQL
+-- ORD_YMD가 선두 컬럼인 T1 X_T_ORD_BIG_3
+SELECT /*+ GATHER_PLAN_STATISTICS INDEX(T1 X_T_ORD_BIG_3) */
+       T1.ORD_ST, COUNT(*)
+  FROM T_ORD_BIG T1
+ WHERE T1.ORD_YMD = '20170301'
+   AND T1.CUS_ID LIKE 'CUS_001%'
+ GROUP BY T1.ORD_ST;
+
+-- 실제 실행계획을 만든 SQL의 SQL_ID찾아내기
+SELECT T1.SQL_ID ,T1.CHILD_NUMBER ,T1.SQL_TEXT
+  FROM V$SQL T1
+ WHERE T1.SQL_TEXT LIKE '%GATHER_PLAN_STATISTICS%'
+ ORDER BY T1.LAST_ACTIVE_TIME DESC;
+
+-- 실제 실행계획 조회하기(각자의 SQL_ID를 사용할 것)
+SELECT *
+  FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('28rt220r7kung',0,'ALLSTATS LAST'));
+/*
+PLAN_TABLE_OUTPUT
+--------------------------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                    | Name          | Starts | E-Rows | A-Rows |   A-Time   | Buffers | Reads  |  OMem |  1Mem | Used-Mem |
+--------------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT             |               |      1 |        |      1 |00:00:01.78 |   10206 |  10206 |       |       |          |
+|   1 |  HASH GROUP BY               |               |      1 |      2 |      1 |00:00:01.78 |   10206 |  10206 |  1096K|  1096K|  712K (0)|
+|   2 |   TABLE ACCESS BY INDEX ROWID| T_ORD_BIG     |      1 |  86337 |  10000 |00:00:01.82 |   10206 |  10206 |       |       |          |
+|*  3 |    INDEX RANGE SCAN          | X_T_ORD_BIG_3 |      1 |  86337 |  10000 |00:00:00.02 |     206 |    206 |       |       |          |
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   3 - access("T1"."ORD_YMD"='20170301' AND "T1"."CUS_ID" LIKE 'CUS_001%')
+       filter("T1"."CUS_ID" LIKE 'CUS_001%')
+*/
+--버퍼캐시 비우기
+ALTER SYSTEM FLUSH BUFFER_CACHE;
+
+-- CUS_ID가 선두 컬럼인 T1 X_T_ORD_BIG_4
+SELECT /*+ GATHER_PLAN_STATISTICS INDEX(T1 X_T_ORD_BIG_4) */
+       T1.ORD_ST, COUNT(*)
+  FROM T_ORD_BIG T1
+ WHERE T1.ORD_YMD = '20170301'
+   AND T1.CUS_ID LIKE 'CUS_001%'
+ GROUP BY T1.ORD_ST;
+
+-- 실제 실행계획을 만든 SQL의 SQL_ID찾아내기
+SELECT T1.SQL_ID ,T1.CHILD_NUMBER ,T1.SQL_TEXT
+  FROM V$SQL T1
+ WHERE T1.SQL_TEXT LIKE '%GATHER_PLAN_STATISTICS%'
+ ORDER BY T1.LAST_ACTIVE_TIME DESC;
+
+-- 실제 실행계획 조회하기(각자의 SQL_ID를 사용할 것)
+SELECT *
+  FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('9uyc4c83yv4j1',0,'ALLSTATS LAST'));
+/*
+PLAN_TABLE_OUTPUT
+--------------------------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                    | Name          | Starts | E-Rows | A-Rows |   A-Time   | Buffers | Reads  |  OMem |  1Mem | Used-Mem |
+--------------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT             |               |      1 |        |      1 |00:00:06.89 |     133K|    133K|       |       |          |
+|   1 |  HASH GROUP BY               |               |      1 |      2 |      1 |00:00:06.89 |     133K|    133K|  1096K|  1096K|  727K (0)|
+|   2 |   TABLE ACCESS BY INDEX ROWID| T_ORD_BIG     |      1 |  86337 |  10000 |00:00:01.12 |     133K|    133K|       |       |          |
+|*  3 |    INDEX RANGE SCAN          | X_T_ORD_BIG_4 |      1 |  86337 |  10000 |00:00:00.69 |     123K|    123K|       |       |          |
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   3 - access("T1"."CUS_ID" LIKE 'CUS_001%' AND "T1"."ORD_YMD"='20170301')
+       filter(("T1"."ORD_YMD"='20170301' AND "T1"."CUS_ID" LIKE 'CUS_001%'))
+*/
+
+-- ************************************************
+-- PART II - 6.3.3 SQL1
+-- ************************************************
+-- 세 개의 조건이 사용된 SQL
+
+-- 최적의 인덱스 구성 방법 (아래 쿼리는 성능개선을 위해 1, 2번 인덱스를 사용해도 둘다 괜찮다.)
+-- 1번 : CUS_ID, PAY_TY, ORD_YMD
+-- 2번 : PAY_TY, CUS_ID, ORD_YMD
+--버퍼캐시 비우기
+ALTER SYSTEM FLUSH BUFFER_CACHE;
+
+SELECT /*+ GATHER_PLAN_STATISTICS */
+       T1.ORD_ST ,COUNT(*)
+  FROM T_ORD_BIG T1
+ WHERE T1.ORD_YMD LIKE '201704%'
+   AND T1.CUS_ID = 'CUS_0042'
+   AND T1.PAY_TP = 'BANK'
+ GROUP BY T1.ORD_ST;
+
+-- 실제 실행계획을 만든 SQL의 SQL_ID찾아내기
+SELECT T1.SQL_ID ,T1.CHILD_NUMBER ,T1.SQL_TEXT
+  FROM V$SQL T1
+ WHERE T1.SQL_TEXT LIKE '%GATHER_PLAN_STATISTICS%'
+ ORDER BY T1.LAST_ACTIVE_TIME DESC;
+
+-- 실제 실행계획 조회하기(각자의 SQL_ID를 사용할 것)
+SELECT *
+  FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('9uyc4c83yv4j1',0,'ALLSTATS LAST'));
+
+-- ************************************************
+-- PART II - 6.3.3 SQL2
+-- ************************************************
+-- 특정 고객ID에 주문이 존재하는지 확인하는 SQL
+-- 최적의 인덱스 구성 방법 (아래 쿼리 쿼리까지 같이 사용해야 한다면 더 좋은 성능개선을 위해 1번 인덱스를 사용하는 것이 좋다.
+-- 1번 : CUS_ID, PAY_TY, ORD_YMD
+--버퍼캐시 비우기
+ALTER SYSTEM FLUSH BUFFER_CACHE;
+SELECT 'X'
+  FROM DUAL A
+ WHERE EXISTS(
+        SELECT *
+          FROM T_ORD_BIG T1
+         WHERE T1.CUS_ID = 'CUS_0042'
+       );
+
+-- ************************************************
+-- PART II - 6.3.4 SQL1
+-- ************************************************
+-- 많은 조건(5개)이 걸리는 SQL
+-- 이러한 경우 컬럼 5개 모두 INDEX로 구성하면 빠르지만, 인덱스를 구성하는 컬럼이 너무 많아진다.
+-- 성능향상에 도움이 되는 조건 컬럼만 선별하여 인덱스를 만들 필요가 있다.
+--버퍼캐시 비우기
+ALTER SYSTEM FLUSH BUFFER_CACHE;
+
+SELECT /*+ GATHER_PLAN_STATISTICS */
+       COUNT(*)
+  FROM T_ORD_BIG T1
+ WHERE T1.ORD_AMT = 2400
+   AND T1.PAY_TP = 'CARD'
+   AND T1.ORD_YMD = '20170406'
+   AND T1.ORD_ST = 'COMP'
+   AND T1.CUS_ID = 'CUS_0036';
+
+-- 실제 실행계획을 만든 SQL의 SQL_ID찾아내기
+SELECT T1.SQL_ID ,T1.CHILD_NUMBER ,T1.SQL_TEXT
+  FROM V$SQL T1
+ WHERE T1.SQL_TEXT LIKE '%GATHER_PLAN_STATISTICS%'
+ ORDER BY T1.LAST_ACTIVE_TIME DESC;
+
+-- 실제 실행계획 조회하기(각자의 SQL_ID를 사용할 것)
+SELECT *
+  FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('9uyc4c83yv4j1',0,'ALLSTATS LAST'));
+
+
+-- ************************************************
+-- PART II - 6.3.4 SQL2
+-- ************************************************
+-- 각 조건별로 카운트 해보기
+SELECT 'ORD_AMT' COL ,COUNT(*) FROM T_ORD_BIG T1 WHERE T1.ORD_AMT = 2400
+ UNION ALL
+SELECT 'PAY_TP' COL ,COUNT(*) FROM T_ORD_BIG T1 WHERE T1.PAY_TP = 'CARD'
+ UNION ALL
+SELECT 'ORD_YMD' COL ,COUNT(*) FROM T_ORD_BIG T1 WHERE T1.ORD_YMD = '20170406'
+ UNION ALL
+SELECT 'ORD_ST' COL ,COUNT(*) FROM T_ORD_BIG T1 WHERE T1.ORD_ST = 'COMP'
+ UNION ALL
+SELECT 'CUS_ID' COL ,COUNT(*)  FROM T_ORD_BIG T1 WHERE T1.CUS_ID = 'CUS_0036';
+/*
+------------------------
+| COL	    |  COUNT(*)  |
+------------------------
+| ORD_AMT	|    630,000 |
+| PAY_TP	| 18,270,000 |
+| ORD_YMD	|     90,000 |
+| ORD_ST	| 27,420,000 |
+| CUS_ID	|    330,000 |
+------------------------
+| TOTAL   | 30,470,000 |
+------------------------
+*/
+
+/* X_T_ORD_BIG_3(ORD_YMD, CUS_ID) 인덱스가 자동으로 선택된다.
+PLAN_TABLE_OUTPUT
+-----------------------------------------------------------------------------------------------------------------
+| Id  | Operation                    | Name          | Starts | E-Rows | A-Rows |   A-Time   | Buffers | Reads  |
+-----------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT             |               |      1 |        |      1 |00:00:00.41 |   10045 |  11374 |
+|   1 |  SORT AGGREGATE              |               |      1 |      1 |      1 |00:00:00.41 |   10045 |  11374 |
+|*  2 |   TABLE ACCESS BY INDEX ROWID| T_ORD_BIG     |      1 |     22 |  10000 |00:00:00.66 |   10045 |  11374 |
+|*  3 |    INDEX RANGE SCAN          | X_T_ORD_BIG_3 |      1 |  10000 |  10000 |00:00:00.01 |      45 |     51 |
+-----------------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - filter(("T1"."ORD_AMT"=2400 AND "T1"."PAY_TP"='CARD' AND "T1"."ORD_ST"='COMP'))
+   3 - access("T1"."ORD_YMD"='20170406' AND "T1"."CUS_ID"='CUS_0036')
+*/
+
+-- ************************************************
+-- PART II - 6.4.1 SQL1
+-- ************************************************
+-- CUS_ID, ORD_YMD인덱스를 사용하는 SQL
+--버퍼캐시 비우기
+ALTER SYSTEM FLUSH BUFFER_CACHE;
+
+SELECT /*+ GATHER_PLAN_STATISTICS INDEX(T1 X_T_ORD_BIG_4) */
+       T1.ORD_ST ,COUNT(*)
+  FROM T_ORD_BIG T1
+ WHERE T1.ORD_YMD LIKE '201703%'
+   AND T1.CUS_ID = 'CUS_0075'
+ GROUP BY T1.ORD_ST;
+
+-- 실제 실행계획을 만든 SQL의 SQL_ID찾아내기
+SELECT T1.SQL_ID ,T1.CHILD_NUMBER ,T1.SQL_TEXT
+  FROM V$SQL T1
+ WHERE T1.SQL_TEXT LIKE '%GATHER_PLAN_STATISTICS%'
+ ORDER BY T1.LAST_ACTIVE_TIME DESC;
+
+-- 실제 실행계획 조회하기(각자의 SQL_ID를 사용할 것)
+SELECT *
+  FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('9uyc4c83yv4j1',0,'ALLSTATS LAST'));
+
+/*
+PLAN_TABLE_OUTPUT (X_T_ORD_BIG_4 인덱스 : CUS_ID, ORD_YMD)
+--------------------------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation                    | Name          | Starts | E-Rows | A-Rows |   A-Time   | Buffers | Reads  |  OMem |  1Mem | Used-Mem |
+--------------------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT             |               |      1 |        |      1 |00:00:00.74 |   30125 |  21529 |       |       |          |
+|   1 |  HASH GROUP BY               |               |      1 |      2 |      1 |00:00:00.74 |   30125 |  21529 |  1096K|  1096K|  442K (0)|
+|   2 |   TABLE ACCESS BY INDEX ROWID| T_ORD_BIG     |      1 |   2081 |  30000 |00:00:00.74 |   30125 |  21529 |       |       |          |
+|*  3 |    INDEX RANGE SCAN          | X_T_ORD_BIG_4 |      1 |   2081 |  30000 |00:00:00.03 |     125 |    152 |       |       |          |
+--------------------------------------------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   3 - access("T1"."CUS_ID"='CUS_0075' AND "T1"."ORD_YMD" LIKE '201703%')
+       filter("T1"."ORD_YMD" LIKE '201703%')
+*/
+
+-- ************************************************
+-- PART II - 6.4.1 SQL2
+-- ************************************************
+-- X_T_ORD_BIG_4인덱스의 재생성
+DROP INDEX X_T_ORD_BIG_4;
+CREATE INDEX X_T_ORD_BIG_4 ON T_ORD_BIG(CUS_ID, ORD_YMD, ORD_ST);
+
+/* 커버드 INDEX 실행계획
+PLAN_TABLE_OUTPUT (X_T_ORD_BIG_4 인덱스 : CUS_ID, ORD_YMD, ORD_ST)
+---------------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation         | Name          | Starts | E-Rows | A-Rows |   A-Time   | Buffers | Reads  |  OMem |  1Mem | Used-Mem |
+---------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT  |               |      1 |        |      1 |00:00:00.02 |     146 |    169 |       |       |          |
+|   1 |  HASH GROUP BY    |               |      1 |      2 |      1 |00:00:00.02 |     146 |    169 |  1096K|  1096K|  472K (0)|
+|*  2 |   INDEX RANGE SCAN| X_T_ORD_BIG_4 |      1 |   2081 |  30000 |00:00:00.01 |     146 |    169 |       |       |          |
+---------------------------------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - access("T1"."CUS_ID"='CUS_0075' AND "T1"."ORD_YMD" LIKE '201703%')
+       filter("T1"."ORD_YMD" LIKE '201703%')
+*/
+
+-- ************************************************
+-- PART II - 6.4.2 SQL1
+-- ************************************************
+-- CUS_0075의 201703주문을 조회하는 SQL
+-- ORD_YMD 컬럼을 변형하여 access 조건이 아닌 필터조건으로 실행되었음을 확인 가능하다.
+--버퍼캐시 비우기
+ALTER SYSTEM FLUSH BUFFER_CACHE;
+
+SELECT /*+ GATHER_PLAN_STATISTICS */
+       T1.ORD_ST ,COUNT(*)
+  FROM T_ORD_BIG T1
+ WHERE SUBSTR(T1.ORD_YMD,1,6) = '201703'
+   AND T1.CUS_ID = 'CUS_0075'
+ GROUP BY T1.ORD_ST;
+
+-- 실제 실행계획을 만든 SQL의 SQL_ID찾아내기
+SELECT T1.SQL_ID ,T1.CHILD_NUMBER ,T1.SQL_TEXT
+  FROM V$SQL T1
+ WHERE T1.SQL_TEXT LIKE '%GATHER_PLAN_STATISTICS%'
+ ORDER BY T1.LAST_ACTIVE_TIME DESC;
+
+-- 실제 실행계획 조회하기(각자의 SQL_ID를 사용할 것)
+SELECT *
+  FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('5zs48c63hfrzw',0,'ALLSTATS LAST'));
+/*
+PLAN_TABLE_OUTPUT (X_T_ORD_BIG_4 인덱스 : CUS_ID, ORD_YMD, ORD_ST)
+---------------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation         | Name          | Starts | E-Rows | A-Rows |   A-Time   | Buffers | Reads  |  OMem |  1Mem | Used-Mem |
+---------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT  |               |      1 |        |      1 |00:00:00.07 |    1616 |   1641 |       |       |          |
+|   1 |  HASH GROUP BY    |               |      1 |      2 |      1 |00:00:00.07 |    1616 |   1641 |  1096K|  1096K|  453K (0)|
+|*  2 |   INDEX RANGE SCAN| X_T_ORD_BIG_4 |      1 |   3386 |  30000 |00:00:00.02 |    1616 |   1641 |       |       |          |
+---------------------------------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - access("T1"."CUS_ID"='CUS_0075')
+       filter(SUBSTR("T1"."ORD_YMD",1,6)='201703')
+*/
+
+-- ************************************************
+-- PART II - 6.4.2 SQL2
+-- ************************************************
+-- CUS_0075의 201703주문을 조회하는 SQL – LIKE로 처리
+-- ORD_YMD 컬럼을 변형하지 않고, LIKE로 범위 처리하여 access 조건으로 실행하였다.(성능 개선됨)
+--버퍼캐시 비우기
+ALTER SYSTEM FLUSH BUFFER_CACHE;
+
+SELECT /*+ GATHER_PLAN_STATISTICS */
+       T1.ORD_ST ,COUNT(*)
+  FROM T_ORD_BIG T1
+ WHERE T1.ORD_YMD LIKE '201703%'
+   AND T1.CUS_ID = 'CUS_0075'
+ GROUP BY T1.ORD_ST;
+
+-- 실제 실행계획을 만든 SQL의 SQL_ID찾아내기
+SELECT T1.SQL_ID ,T1.CHILD_NUMBER ,T1.SQL_TEXT
+  FROM V$SQL T1
+ WHERE T1.SQL_TEXT LIKE '%GATHER_PLAN_STATISTICS%'
+ ORDER BY T1.LAST_ACTIVE_TIME DESC;
+
+-- 실제 실행계획 조회하기(각자의 SQL_ID를 사용할 것)
+SELECT *
+  FROM TABLE(DBMS_XPLAN.DISPLAY_CURSOR('2c1rjnnd119z9',0,'ALLSTATS LAST'));
+/*
+PLAN_TABLE_OUTPUT (X_T_ORD_BIG_4 인덱스 : CUS_ID, ORD_YMD, ORD_ST)
+---------------------------------------------------------------------------------------------------------------------------------
+| Id  | Operation         | Name          | Starts | E-Rows | A-Rows |   A-Time   | Buffers | Reads  |  OMem |  1Mem | Used-Mem |
+---------------------------------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT  |               |      1 |        |      1 |00:00:00.01 |     146 |    169 |       |       |          |
+|   1 |  HASH GROUP BY    |               |      1 |      2 |      1 |00:00:00.01 |     146 |    169 |  1096K|  1096K|  453K (0)|
+|*  2 |   INDEX RANGE SCAN| X_T_ORD_BIG_4 |      1 |   2081 |  30000 |00:00:00.01 |     146 |    169 |       |       |          |
+---------------------------------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+
+   2 - access("T1"."CUS_ID"='CUS_0075' AND "T1"."ORD_YMD" LIKE '201703%')
+       filter("T1"."ORD_YMD" LIKE '201703%')
+*/
+
+-- ************************************************
+-- PART II - 6.4.3 SQL1
+-- ************************************************
+-- 테이블 및 인덱스 크기 확인
+SELECT T1.SEGMENT_NAME
+     , T1.SEGMENT_TYPE
+     , T1.BYTES / 1024 / 1024 as SIZE_MB
+     , T1.BYTES / T2.CNT BYTE_PER_ROW
+  FROM DBA_SEGMENTS T1
+     , (SELECT COUNT(*) CNT
+          FROM ORA_SQL_TEST.T_ORD_BIG
+       ) T2
+ WHERE T1.SEGMENT_NAME LIKE '%ORD_BIG%'
+ ORDER BY T1.SEGMENT_NAME;
+/*
+----------------------------------------------------------------
+| SEGMENT_NAME	    | SEGMENT_TYPE	| SIZE_MB	  | BYTE_PER_ROW |
+----------------------------------------------------------------
+| T_ORD_BIG	        | TABLE	        |   2048	  |     70.48    |
+| X_T_ORD_BIG_1	    | INDEX	        |    672	  |     23.13    |
+| X_T_ORD_BIG_2	    | INDEX	        |    504	  |     17.34    |
+| X_T_ORD_BIG_3	    | INDEX	        |    974	  |     33.52    |
+| X_T_ORD_BIG_4	    | INDEX	        |   1152	  |     39.64    |
+| X_T_ORD_BIG_TEST	| INDEX	        |    504	  |     17.34    |
+----------------------------------------------------------------
+*/
