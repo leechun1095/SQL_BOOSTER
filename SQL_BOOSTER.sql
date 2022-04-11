@@ -5011,3 +5011,147 @@ Predicate Information (identified by operation id):
    8 - access("T3"."CUS_ID"="T2"."CUS_ID")
    9 - filter("T3"."CUS_GD"='B')
 */
+
+
+-- ************************************************
+-- PART III - 8.1.2 SQL1
+-- ************************************************
+-- 계좌 테이블 및 계좌 데이터 생성
+-- 계좌 테이블을 생성
+CREATE TABLE M_ACC
+(
+	ACC_NO VARCHAR2(40)  NOT NULL,
+	ACC_NM VARCHAR2(100)  NULL,
+	BAL_AMT NUMBER(18,3)  NULL
+);
+
+ALTER TABLE M_ACC
+	ADD CONSTRAINT  PK_M_ACC PRIMARY KEY (ACC_NO) USING INDEX;
+
+-- 테스트 데이터를 생성.
+INSERT INTO M_ACC(ACC_NO ,ACC_NM ,BAL_AMT)
+SELECT 'ACC1' ,'1번계좌' ,3000 FROM DUAL UNION ALL
+SELECT 'ACC2' ,'2번계좌' ,500 FROM DUAL UNION ALL
+SELECT 'ACC3' ,'3번계좌' ,0 FROM DUAL;
+
+
+-- ************************************************
+-- PART III - 8.1.2 SQL2
+-- ************************************************
+-- 계좌이체 – ACC1에서 ACC2로 500원 이체
+-- 두 개의 UPDATE문을 실행한 다음에 COMMIT 했으므로, 두 UPDATE 문장은 하나의 트랜잭션으로 처리된다.
+UPDATE M_ACC T1
+   SET T1.BAL_AMT = T1.BAL_AMT - 500
+ WHERE T1.ACC_NO = 'ACC1';
+
+UPDATE M_ACC T1
+   SET T1.BAL_AMT = T1.BAL_AMT + 500
+ WHERE T1.ACC_NO = 'ACC2';
+
+COMMIT;
+
+-- ************************************************
+-- PART III - 8.1.2 SQL3
+-- ************************************************
+-- 계좌이체 – ACC1에서 ACC4로 500원 이체
+UPDATE M_ACC T1
+   SET T1.BAL_AMT = T1.BAL_AMT - 500
+ WHERE T1.ACC_NO = 'ACC1';
+
+-- 존재하지 않는 계좌이지만 에러가 발생하지 않고, 0 rows Updated 가 된다.
+UPDATE M_ACC T1
+   SET T1.BAL_AMT = T1.BAL_AMT + 500
+ WHERE T1.ACC_NO = 'ACC4';
+
+SELECT * FROM M_ACC;
+
+-- ************************************************
+-- PART III - 8.1.2 SQL4
+-- ************************************************
+-- 계좌이체 – ACC1에서 ACC4로 500원 이체, ROLLBACK 처리
+ROLLBACK;
+
+SELECT * FROM M_ACC;
+
+-- ************************************************
+-- PART III - 8.1.2 SQL5
+-- ************************************************
+-- 계좌이체 – 계좌존재여부 검증
+SELECT NVL(MAX('Y'),'N')
+  FROM DUAL T1
+ WHERE EXISTS(
+		          SELECT * FROM M_ACC A WHERE A.ACC_NO = 'ACC4');
+
+-- ************************************************
+-- PART III - 8.1.2 SQL6
+-- ************************************************
+-- 계좌이체 – ACC1에서 ACC3로 5000원 이체
+UPDATE M_ACC T1
+   SET T1.BAL_AMT = T1.BAL_AMT - 5000
+ WHERE T1.ACC_NO = 'ACC1';
+
+UPDATE M_ACC T1
+   SET T1.BAL_AMT = T1.BAL_AMT + 5000
+ WHERE T1.ACC_NO = 'ACC3';
+
+SELECT  * FROM M_ACC;
+
+-- ************************************************
+-- PART III - 8.1.2 SQL7
+-- ************************************************
+ROLLBACK;
+
+SELECT  * FROM M_ACC;
+
+-- ************************************************
+-- PART III - 8.1.2 SQL8
+-- ************************************************
+-- 새로운 계좌를 INSERT
+INSERT INTO M_ACC(ACC_NO ,ACC_NM ,BAL_AMT)
+VALUES('ACC4' ,'4번계좌' ,0);
+
+INSERT INTO M_ACC(ACC_NO ,ACC_NM ,BAL_AMT)
+VALUES('ACC1' ,'1번계좌' ,0); --ACC1은 이미 존재하므로 에러가 발생한다.
+
+-- ORA-00001: unique constraint (TEST.PK_M_ACC) violated
+SELECT  * FROM M_ACC;
+
+ROLLBACK;
+
+-- ************************************************
+-- PART III - 8.1.3 SQL1
+-- ************************************************
+-- UPDATE-SELECT 테스트 – 첫 번째 세션 SQL
+SELECT  * FROM M_ACC T1 WHERE T1.ACC_NO = 'ACC1'; --ACC1의 잔액은 2500원
+
+UPDATE M_ACC T1
+   SET T1.BAL_AMT = 5000
+ WHERE T1.ACC_NO = 'ACC1';
+
+SELECT  * FROM M_ACC T1 WHERE T1.ACC_NO = 'ACC1'; --ACC1의 잔액 5000원
+
+-- ************************************************
+-- PART III - 8.1.3 SQL2
+-- ************************************************
+-- UPDATE-SELECT 테스트 – 두 번째 세션 SQL
+SELECT  * FROM M_ACC T1 WHERE T1.ACC_NO = 'ACC1'; --ACC1의 잔액은 2500원
+
+
+-- ************************************************
+-- PART III - 8.1.3 SQL3
+-- ************************************************
+-- UPDATE-SELECT 테스트 – 첫 번째 세션 COMMIT 처리
+-- READ COMMITTED : COMMIT 된 데이터만 읽을 수 있다.
+-- 커밋하면 두 번째 세션에서 조회해도 동일하게 5000원으로 조회된다.
+COMMIT;
+
+-- ************************************************
+-- PART III - 8.1.3 SQL4
+-- ************************************************
+-- UPDATE – UPDATE 테스트 – 첫 번째 세션 SQL
+-- 현재 ACC1의 잔액은 5,000
+UPDATE M_ACC T1
+   SET T1.BAL_AMT = T1.BAL_AMT - 500
+ WHERE T1.ACC_NO = 'ACC1';
+
+SELECT  * FROM M_ACC T1 WHERE T1.ACC_NO = 'ACC1'; --ACC1의 잔액은 4,500원
