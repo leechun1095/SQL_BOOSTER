@@ -812,3 +812,289 @@ BEGIN
 	RETURN v_NEW_PO_NO;
 
 END;
+
+-- ************************************************
+-- PART III - 8.3.5 SQL2
+-- ************************************************
+-- 채번함수를 사용한 채번
+DECLARE
+	v_NEW_PO_NO VARCHAR2(40);
+	v_REQ_DT DATE;
+	v_REQ_YMD VARCHAR2(8);
+BEGIN
+	v_REQ_DT := TO_DATE('20170305 23:59:59','YYYYMMDD HH24:MI:SS');
+	v_REQ_YMD := TO_CHAR(v_REQ_DT,'YYYYMMDD'); -- 입력받은 v_REQ_DT를 v_REQ_YMD로 변환
+
+	v_NEW_PO_NO := UFN_GET_PO_NO(v_REQ_YMD);
+
+	INSERT INTO T_PO (PO_NO ,TIT ,REQ_DT ,REQ_UID)
+	VALUES (v_NEW_PO_NO ,'TEST_'||v_NEW_PO_NO ,v_REQ_DT ,'TEST');
+
+	COMMIT;
+END;
+
+-- ************************************************
+-- PART III - 8.3.5 SQL3
+-- ************************************************
+-- 통합채번 테이블 생성
+CREATE TABLE M_NUM
+(
+	NUM_TP VARCHAR2(40) NOT NULL,
+	BAS_YMD VARCHAR(8) NOT NULL,
+	LST_NO VARCHAR2(40)  NOT NULL
+);
+
+CREATE UNIQUE INDEX PK_M_NUM ON M_NUM(NUM_TP, BAS_YMD);
+
+ALTER TABLE M_NUM
+	ADD CONSTRAINT  PK_M_NUM PRIMARY KEY (NUM_TP, BAS_YMD) USING INDEX;
+
+-- ************************************************
+-- PART III - 8.3.5 SQL4
+-- ************************************************
+-- 통합된 형태의 채번함수
+CREATE OR REPLACE FUNCTION UFN_GET_NUM
+(    v_NUM_TP IN VARCHAR2
+	,v_BAS_YMD IN VARCHAR2 )
+RETURN VARCHAR2 IS PRAGMA AUTONOMOUS_TRANSACTION;
+	v_NEW_NO VARCHAR2(40);
+	v_PREFIX VARCHAR2(40);
+	v_LENGTH INT;
+BEGIN
+	SELECT  CASE  WHEN v_NUM_TP = 'PO' THEN 'PO'
+				  WHEN v_NUM_TP = 'SO' THEN 'SO'
+				  WHEN v_NUM_TP = 'CS' THEN 'CS'
+			END
+			,CASE WHEN v_NUM_TP = 'PO' THEN 8
+				  WHEN v_NUM_TP = 'SO' THEN 8
+				  WHEN v_NUM_TP = 'CS' THEN 4
+			END
+	INTO    v_PREFIX
+			,v_LENGTH
+	FROM    DUAL;
+
+	--채번 실행.
+	UPDATE  M_NUM T1
+	SET     T1.LST_NO = v_PREFIX || v_BAS_YMD ||
+				LPAD(TO_CHAR(TO_NUMBER(
+						NVL(SUBSTR(T1.LST_NO,(-1*v_LENGTH)),'0')
+			) + 1),v_LENGTH,'0')
+	WHERE   T1.NUM_TP = v_NUM_TP
+	AND     T1.BAS_YMD = v_BAS_YMD;
+
+	--업데이트 데이터가 없으면, 최초 채번이므로 INSERT수행.
+	IF SQL%ROWCOUNT=0 THEN
+		INSERT INTO M_NUM (NUM_TP ,BAS_YMD ,LST_NO)
+		VALUES  (v_NUM_TP ,v_BAS_YMD ,v_PREFIX||v_BAS_YMD||LPAD('1',v_LENGTH,'0'));
+	END IF;
+
+	--채번값 GET(채번 유형까지 변수로 사용)
+	SELECT  T1.LST_NO
+	INTO    v_NEW_NO
+	FROM    M_NUM T1
+	WHERE   T1.NUM_TP = v_NUM_TP
+	AND     T1.BAS_YMD = v_BAS_YMD;
+
+	COMMIT; --트랜잭션 COMMIT처리.
+
+	RETURN v_NEW_NO;
+END;
+
+-- ************************************************
+-- PART III - 8.3.5 SQL5
+-- ************************************************
+-- 통합 채번함수 사용
+SELECT UFN_GET_NUM('PO','20170501') PO_NO
+		 , UFN_GET_NUM('SO','20170501') SO_NO
+		 , UFN_GET_NUM('CS','20170501') CS_ID
+  FROM DUAL;
+
+-- ************************************************
+-- PART III - 8.4.1 SQL1
+-- ************************************************
+-- 시퀀스 객체를 사용할 때 테이블에 부여한 시퀀스 값에 구멍이 빠질 수 있다.
+-- 구멍이 빠졌다는 뜻은 부여된 시퀀스 값이 1, 2, 4 와 같이 중간에 값이 없는 것을 뜻한다.
+-- 그 이유는 스퀀스가 트랜잭션의 커밋과 롤백과는 무관하게 처리되기 때문이다.
+-- 계좌이체 테이블 생성
+CREATE TABLE T_ACC_TRN
+(
+	ACC_TRN_SEQ           NUMBER(18)  NOT NULL,
+	FR_ACC_NO             VARCHAR2(40)  NULL,
+	TO_ACC_NO             VARCHAR2(40)  NULL,
+	TRN_AMT               NUMBER(18,3)  NULL,
+	TRN_HND_ST            VARCHAR2(40)  NULL,
+	TRN_ERR_CD            VARCHAR2(40)  NULL,
+	TRN_REQ_DT            TIMESTAMP  NULL,
+	TRN_CMP_DT            TIMESTAMP  NULL
+);
+
+ALTER TABLE T_ACC_TRN
+	ADD CONSTRAINT T_ACC_TRN PRIMARY KEY (ACC_TRN_SEQ) USING INDEX;
+
+ALTER TABLE T_ACC_TRN
+	ADD (CONSTRAINT  FK_T_ACC_TRN_1 FOREIGN KEY (FR_ACC_NO) REFERENCES M_ACC(ACC_NO));
+
+ALTER TABLE T_ACC_TRN
+	ADD (CONSTRAINT  FK_T_ACC_TRN_2 FOREIGN KEY (TO_ACC_NO) REFERENCES M_ACC(ACC_NO));
+
+-- ************************************************
+-- PART III - 8.4.1 SQL2
+-- ************************************************
+-- 계좌이체 시퀀스 생성
+CREATE SEQUENCE SQ_T_ACC_TRN
+START WITH 1
+INCREMENT BY 1
+MAXVALUE 99999999999999999999999999
+NOCYCLE
+CACHE 20
+NOORDER;
+
+
+
+-- ************************************************
+-- PART III - 8.4.1 SQL3
+-- ************************************************
+-- 시퀀스를 이용한 계좌이체 처리
+DECLARE
+  v_NEW_ACC_TRN_SEQ NUMBER(18);
+BEGIN
+
+  v_NEW_ACC_TRN_SEQ := SQ_T_ACC_TRN.NEXTVAL();
+
+  INSERT INTO T_ACC_TRN
+		(ACC_TRN_SEQ ,FR_ACC_NO ,TO_ACC_NO ,TRN_AMT ,TRN_HND_ST ,TRN_ERR_CD ,TRN_REQ_DT ,TRN_CMP_DT)
+  VALUES(v_NEW_ACC_TRN_SEQ ,'ACC1' ,'ACC3' ,500 ,'REQ' ,NULL ,SYSDATE ,NULL);
+
+  COMMIT;
+END;
+
+-- ************************************************
+-- PART III - 8.4.2 SQL1
+-- ************************************************
+-- 시퀀스를 이용한 계좌이체 처리 – 잘못된 방법
+DECLARE
+  v_NEW_ACC_TRN_SEQ NUMBER(18);
+BEGIN
+
+  INSERT INTO T_ACC_TRN
+		(ACC_TRN_SEQ ,FR_ACC_NO ,TO_ACC_NO ,TRN_AMT ,TRN_HND_ST ,TRN_ERR_CD ,TRN_REQ_DT ,TRN_CMP_DT)
+  VALUES(SQ_T_ACC_TRN.NEXTVAL ,'ACC1' ,'ACC3' ,500 ,'REQ' ,NULL ,SYSDATE ,NULL);
+
+  SELECT  MAX(ACC_TRN_SEQ)
+  INTO    v_NEW_ACC_TRN_SEQ
+  FROM    T_ACC_TRN;
+
+  COMMIT;
+END;
+
+-- ************************************************
+-- PART III - 8.4.2 SQL2
+-- ************************************************
+-- 시퀀스를 이용한 계좌이체 처리 – CURRVAL 이용
+DECLARE
+  v_NEW_ACC_TRN_SEQ NUMBER(18);
+BEGIN
+
+  INSERT INTO T_ACC_TRN
+		(ACC_TRN_SEQ ,FR_ACC_NO ,TO_ACC_NO ,TRN_AMT ,TRN_HND_ST ,TRN_ERR_CD ,TRN_REQ_DT ,TRN_CMP_DT)
+  VALUES(SQ_T_ACC_TRN.NEXTVAL ,'ACC1' ,'ACC3' ,500 ,'REQ' ,NULL ,SYSDATE ,NULL);
+
+  v_NEW_ACC_TRN_SEQ := SQ_T_ACC_TRN.CURRVAL();
+
+  DBMS_OUTPUT.PUT_LINE('NEW SEQ:'||TO_CHAR(v_NEW_ACC_TRN_SEQ));
+
+  COMMIT;
+END;
+
+-- ************************************************
+-- PART III - 8.4.3 SQL1
+-- ************************************************
+-- T_CUS_LGN 테이블 생성 및 테스트 데이터 입력
+CREATE TABLE T_CUS_LGN
+(
+	CUS_ID VARCHAR2(40) NOT NULL,
+	LGN_DT DATE NOT NULL,
+	SUC_YN VARCHAR2(40) NULL,
+	LGN_FAL_CD VARCHAR2(40) NULL
+);
+
+CREATE UNIQUE INDEX PK_T_CUS_LGN ON T_CUS_LGN(CUS_ID, LGN_DT);
+
+ALTER TABLE T_CUS_LGN
+	ADD CONSTRAINT PK_T_CUS_LGN PRIMARY KEY(CUS_ID, LGN_DT) USING INDEX;
+
+
+INSERT INTO T_CUS_LGN (CUS_ID ,LGN_DT ,SUC_YN ,LGN_FAL_CD)
+SELECT  T1.CUS_ID ,T2.LGN_DT
+		,CASE WHEN T1.CUS_ID = 'CUS_0001' AND RNO >= 4998 THEN 'N' ELSE 'Y' END SUC_YN
+		,CASE WHEN T1.CUS_ID = 'CUS_0001' AND RNO >= 4998 THEN 'PW.WRONG' ELSE NULL END LGN_FAL_CD
+FROM    M_CUS T1
+		,(    SELECT TO_DATE('20170301','YYYYMMDD') + (ROWNUM / 24 / 60 / 30) LGN_DT
+					,ROWNUM  RNO
+			  FROM  DUAL A CONNECT BY ROWNUM <= 5000
+		) T2;
+
+-- ************************************************
+-- PART III - 8.4.3 SQL2
+-- ************************************************
+-- 로그인 연속 실패 카운트 – 좋지 못한 방법
+SELECT COUNT(*)
+  FROM T_CUS_LGN T1
+ WHERE T1.LGN_DT > (SELECT MAX(T1.LGN_DT) LAST_SUC_DT
+                      FROM T_CUS_LGN T1
+                     WHERE T1.CUS_ID = 'CUS_0001'
+                       AND T1.SUC_YN = 'Y'
+                   )
+   AND T1.CUS_ID = 'CUS_0001'
+   AND T1.SUC_YN = 'N';
+
+-- ************************************************
+-- PART III - 8.4.3 SQL3
+-- ************************************************
+-- 로그인 연속 실패 카운트 – ROWNUM과 인덱스를 활용한 효율적인 방법
+SELECT /*+ GATHER_PLAN_STATISTICS */ COUNT(*)
+  FROM (
+        SELECT *
+          FROM (
+                -- 인라인뷰 안쪽
+                SELECT *
+                  FROM T_CUS_LGN T1
+                 WHERE T1.CUS_ID = 'CUS_0001'
+                 ORDER BY T1.LGN_DT DESC
+               ) T2
+		     WHERE ROWNUM <= 3
+		   ) T3
+ WHERE T3.SUC_YN = 'N';
+
+-- PK가 CUS_ID, LGN_DT 로 되어 있어 인덱스를 잘 탔다.
+-----------------------------------------------------------------------------------------------------------
+| Id  | Operation                        | Name         | Starts | E-Rows | A-Rows |   A-Time   | Buffers |
+-----------------------------------------------------------------------------------------------------------
+|   0 | SELECT STATEMENT                 |              |      1 |        |      1 |00:00:00.01 |       4 |
+|   1 |  SORT AGGREGATE                  |              |      1 |      1 |      1 |00:00:00.01 |       4 |
+|*  2 |   VIEW                           |              |      1 |      3 |      3 |00:00:00.01 |       4 |
+|*  3 |    COUNT STOPKEY                 |              |      1 |        |      3 |00:00:00.01 |       4 |
+|   4 |     VIEW                         |              |      1 |   5180 |      3 |00:00:00.01 |       4 |
+|   5 |      TABLE ACCESS BY INDEX ROWID | T_CUS_LGN    |      1 |   5180 |      3 |00:00:00.01 |       4 |
+|*  6 |       INDEX RANGE SCAN DESCENDING| PK_T_CUS_LGN |      1 |      4 |      3 |00:00:00.01 |       3 |
+-----------------------------------------------------------------------------------------------------------
+
+Predicate Information (identified by operation id):
+---------------------------------------------------
+  2 - filter("T3"."SUC_YN"='N')
+  3 - filter(ROWNUM<=3)
+  6 - access("T1"."CUS_ID"='CUS_0001')
+
+-- ************************************************
+-- PART III - 8.4.3 SQL4
+-- ************************************************
+-- 로그인 연속 실패 카운트 – ROWNUM과 인덱스를 잘 못 사용한 경우
+SELECT *
+  FROM (
+        SELECT *
+          FROM T_CUS_LGN T1
+         WHERE T1.CUS_ID = 'CUS_0001'
+         ORDER BY T1.LGN_DT DESC
+		   ) T2
+ WHERE ROWNUM <= 3
+   AND T2.SUC_YN = 'N'
